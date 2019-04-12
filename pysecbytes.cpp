@@ -10,7 +10,8 @@ static void _hexdump(char *dat, size_t len) {
 }
  
 #ifdef _WIN32
-    #define MEMSCAN    
+    #define MEMSCAN_SUPPORTED true
+
     #include <Windows.h>
     #include <vector>
 
@@ -67,10 +68,19 @@ static void _hexdump(char *dat, size_t len) {
         return 0;
     }
 #elif __linux__
-    #define MEMSCAN    
+    #define MEMSCAN_SUPPORTED check_memstats()
 
     extern "C" {
     #include "memstats.h"
+    }
+
+    static bool check_memstats() {
+        printf("CHECK 1\n");
+        auto range = mem_stats(0);
+        if (!range)
+            return false;
+        free_mem_stats(range);
+        return true;
     }
 
     static char* getAddressOfData(const char *a, size_t lena, const char *b, size_t lenb) {
@@ -78,10 +88,12 @@ static void _hexdump(char *dat, size_t len) {
         if (!range)
             return 0;
 
+        printf("CHECK 2\n");
         char *ret = NULL;
         while(!ret && range) {
             if (range->perms & PERMS_READ) {
             if (!strcmp(range->name,"[heap]") || !strcmp(range->name,"[stack]") || !strcmp(range->name,"")) {
+                printf("CHECK 3\n");
                 for(size_t i = 0; i < (range->length - lena - lenb + 1); ++i)
                 {
                     if(memcmp(a, ((char *)range->start)+i, lena) == 0)
@@ -93,11 +105,13 @@ static void _hexdump(char *dat, size_t len) {
                         }
                     }
                 }
+                printf("CHECK 4\n");
             }
             }
             range = range->next;
         }
 
+        printf("CHECK 5\n");
         free_mem_stats(range);
         return ret;
     }
@@ -320,11 +334,11 @@ static void pysafemem_init(PyObject*m) {
     PyModule_AddIntConstant(m, "safemem_supported", 0);
 #endif
 
-#ifdef MEMSCAN    
-    PyModule_AddIntConstant(m, "scanmem_supported", 1);
-#else
-    PyModule_AddIntConstant(m, "scanmem_supported", 0);
-#endif
+    if (MEMSCAN_SUPPORTED) {
+        PyModule_AddIntConstant(m, "scanmem_supported", 1);
+    } else {
+        PyModule_AddIntConstant(m, "scanmem_supported", 0);
+    }
 
     if (PyType_Ready(&SafeCtxType) < 0)
         return;
