@@ -93,7 +93,7 @@ static void _hexdump(char *dat, size_t len) {
         while(!ret && range) {
             if (range->perms & PERMS_READ) {
             if (!strcmp(range->name,"[heap]") || !strcmp(range->name,"[stack]") || !strcmp(range->name,"")) {
-                printf("CHECK 3\n");
+                printf("CHECK 3 %s %o\n", range->name, range->perms);
                 for(size_t i = 0; i < (range->length - lena - lenb + 1); ++i)
                 {
                     if(memcmp(a, ((char *)range->start)+i, lena) == 0)
