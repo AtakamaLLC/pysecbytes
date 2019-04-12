@@ -70,6 +70,8 @@ static void _hexdump(char *dat, size_t len) {
 #elif __linux__
     #define MEMSCAN_SUPPORTED check_memstats()
 
+    #include <signal.h>
+
     extern "C" {
     #include "memstats.h"
     }
@@ -83,11 +85,27 @@ static void _hexdump(char *dat, size_t len) {
         return true;
     }
 
+    void segfault_ignore(int sig, siginfo_t *info, void *ucontext)
+    {
+    }
+
+    struct sigaction suppress_segv() {
+        struct sigaction sa;
+        memset(&sa, 0, sizeof(struct sigaction));
+        sigemptyset(&sa.sa_mask);
+        sa.sa_sigaction = segfault_ignore;
+        sa.sa_flags   = SA_SIGINFO;
+        struct sigaction oldact;
+        sigaction(SIGSEGV, &sa, &oldact);
+        return oldact;
+    }
+
     static char* getAddressOfData(const char *a, size_t lena, const char *b, size_t lenb) {
         auto range = mem_stats(0);
         if (!range)
             return 0;
 
+        auto save = suppress_segv();
         printf("CHECK 2\n");
         char *ret = NULL;
         while(!ret && range) {
@@ -110,6 +128,8 @@ static void _hexdump(char *dat, size_t len) {
             }
             range = range->next;
         }
+
+        sigaction(SIGSEGV, &save, NULL);
 
         printf("CHECK 5\n");
         free_mem_stats(range);
