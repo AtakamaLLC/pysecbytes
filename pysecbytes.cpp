@@ -80,6 +80,7 @@ static void _hexdump(char *dat, size_t len) {
 
         char *ret = NULL;
         while(!ret && range) {
+            if (range->perms & PERMS_READ) {
             if (!strcmp(range->name,"[heap]") || !strcmp(range->name,"[stack]") || !strcmp(range->name,"")) {
                 for(size_t i = 0; i < (range->length - lena - lenb + 1); ++i)
                 {
@@ -92,6 +93,7 @@ static void _hexdump(char *dat, size_t len) {
                         }
                     }
                 }
+            }
             }
             range = range->next;
         }
