@@ -2,13 +2,15 @@
 
 #include <Python.h>
 
+/*
 static void _hexdump(char *dat, size_t len) {
     for (size_t i=0;i<len;++i) {
         printf("%02x", dat[i]);
     }
     printf("\n");
 }
- 
+*/
+
 #ifdef _WIN32
     #define MEMSCAN_SUPPORTED true
 
@@ -71,13 +73,16 @@ static void _hexdump(char *dat, size_t len) {
     #define MEMSCAN_SUPPORTED check_memstats()
 
     #include <signal.h>
+    #include <setjmp.h>
+    #include <stdexcept>
 
     extern "C" {
     #include "memstats.h"
     }
 
+    static jmp_buf jumpbuf;
+
     static bool check_memstats() {
-        printf("CHECK 1\n");
         auto range = mem_stats(0);
         if (!range)
             return false;
@@ -85,19 +90,24 @@ static void _hexdump(char *dat, size_t len) {
         return true;
     }
 
-    void segfault_ignore(int sig, siginfo_t *info, void *ucontext)
+	static void unblock_signal(int signum __attribute__((__unused__)))
+	{
+#ifdef _POSIX_VERSION
+		sigset_t sigs;
+		sigemptyset(&sigs);
+		sigaddset(&sigs, signum);
+		sigprocmask(SIG_UNBLOCK, &sigs, NULL);
+#endif
+	}
+
+    void segfault_ignore(int sig)
     {
+		unblock_signal(sig);
+        longjmp(jumpbuf, 1);
     }
 
-    struct sigaction suppress_segv() {
-        struct sigaction sa;
-        memset(&sa, 0, sizeof(struct sigaction));
-        sigemptyset(&sa.sa_mask);
-        sa.sa_sigaction = segfault_ignore;
-        sa.sa_flags   = SA_SIGINFO;
-        struct sigaction oldact;
-        sigaction(SIGSEGV, &sa, &oldact);
-        return oldact;
+    sighandler_t suppress_segv() {
+        return signal(SIGSEGV, segfault_ignore);
     }
 
     static char* getAddressOfData(const char *a, size_t lena, const char *b, size_t lenb) {
@@ -105,33 +115,35 @@ static void _hexdump(char *dat, size_t len) {
         if (!range)
             return 0;
 
-        auto save = suppress_segv();
-        printf("CHECK 2\n");
+        /* this is necessary because it's possible to read in memory information, and have it change
+         * while you are executing.
+         * there may be a linux api that works better (like the windows one above)
+         */
+        
         char *ret = NULL;
         while(!ret && range) {
             if (range->perms & PERMS_READ) {
             if (!strcmp(range->name,"[heap]") || !strcmp(range->name,"[stack]") || !strcmp(range->name,"")) {
-                printf("CHECK 3 %s %o\n", range->name, range->perms);
-                for(size_t i = 0; i < (range->length - lena - lenb + 1); ++i)
-                {
-                    if(memcmp(a, ((char *)range->start)+i, lena) == 0)
+                auto save = suppress_segv();
+                if (setjmp(jumpbuf) == 0) {
+                    for(size_t i = 0; i < (range->length - lena - lenb + 1); ++i)
                     {
-                        if(memcmp(b, (((char *)range->start)+i) + lena, lenb) == 0)
+                        if(memcmp(a, ((char *)range->start)+i, lena) == 0)
                         {
-                            ret = ((char *)range->start)+i;
-                            break;
+                            if(memcmp(b, (((char *)range->start)+i) + lena, lenb) == 0)
+                            {
+                                ret = ((char *)range->start)+i;
+                                break;
+                            }
                         }
                     }
                 }
-                printf("CHECK 4\n");
+                signal(SIGSEGV, save);
             }
             }
             range = range->next;
         }
 
-        sigaction(SIGSEGV, &save, NULL);
-
-        printf("CHECK 5\n");
         free_mem_stats(range);
         return ret;
     }
