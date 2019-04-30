@@ -1,14 +1,23 @@
-language: python
-os:
-  - linux
-  - osx
-  - windows
-python:
-  - "2.7"
-  - "3.5"
-  - "3.6"
+language: pythoni
+matrix:
+  include:
+    - python: 3.7           # this works for Linux but is ignored on macOS or Windows
+      dist: xenial          # required for Python >= 3.7
+    - python: 3.6
+    - python: 3.5
+    - python: 2.7
+    - name: "python 3.7 osx 10.14.3"
+      os: osx
+      osx_image: xcode10.2  # Python 3.7.2 running on macOS 10.14.3
+      language: shell       # 'language: python' is an error on Travis CI macOS
+    - name: "python choco latest windows"
+       os: windows           # Windows 10.0.17134 N/A Build 17134i
+      env: PATH=/c/Python37:/c/Python37/Scripts:$PATH
+      before_install: choco install python
+      language: shell
 # command to install dependencies
 install:
+  - pip install --upgrade pip
   - pip install nose
   - python setup.py install
 # command to run tests
