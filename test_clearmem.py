@@ -53,11 +53,12 @@ class TestSecureBytes(unittest.TestCase):
         # adjacent a+b not in memory
         assert(not scanmem(a,b))
 
-        # you really needed that clearmem!
-        del t
-        import gc
-        gc.collect()
-        assert(scanmem(b,c))
+        if sys.platform == "win32":
+            # you really needed that clearmem!
+            del t
+            import gc
+            gc.collect()
+            assert(scanmem(b,c))
 
     @unittest.skipIf(not safemem_supported,"python2 no allocators")
     def test_safemem_context(self):
