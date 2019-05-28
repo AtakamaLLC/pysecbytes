@@ -159,6 +159,17 @@ static PyObject* SecureBytes_clearmem(PyObject *self, PyObject *args) {
     char *buffer;
     Py_ssize_t length;
 
+#if PY_MAJOR_VERSION >= 3
+    Py_buffer buf;
+    if(PyArg_ParseTuple(args, "w*", &buf)) {
+        if (PyBuffer_IsContiguous(&buf, 'A')) {
+            memset(buf.buf, 0, buf.len);
+        }
+        Py_RETURN_NONE;
+    }
+    PyErr_Clear();
+#endif
+
     if(PyArg_ParseTuple(args, "s#", &buffer, &length)) {
         memset(buffer, 0, length);
         Py_RETURN_NONE;
