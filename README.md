@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/VidaID/pysecbytes.svg?branch=master)](https://travis-ci.com/VidaID/pysecbytes)
+[![Build Status](https://travis-ci.com/AtakamaLLC/pysecbytes.svg?branch=master)](https://travis-ci.com/VidaID/pysecbytes)
 
 ## Install:
 
